@@ -3,10 +3,13 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
+const path = require('path');
 
 const config = require('./src/config');
 const requestLogger = require('./src/middleware/requestLogger');
 const errorHandler = require('./src/middleware/errorHandler');
+const { apiLimiter } = require('./src/middleware/rateLimiter');
+const tracker = require('./src/utils/requestTracker');
 const apiRoutes = require('./src/routes/api');
 
 const app = express();
@@ -25,16 +28,28 @@ app.use(compression()); // Compress responses
 // ===== Logging Middleware =====
 app.use(requestLogger);
 
-// ===== Routes =====
-app.get('/', (req, res) => {
-  res.json({
-    name: 'Amplitude API',
-    version: '1.0.0',
-    status: 'running',
-    timestamp: new Date(),
+// ===== Request Tracking Middleware =====
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    tracker.track(req, res, duration);
   });
+  next();
 });
 
+// ===== Serve Static Files =====
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ===== Root Route =====
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ===== API Rate Limiting =====
+app.use('/api', apiLimiter);
+
+// ===== API Routes =====
 app.use('/api', apiRoutes);
 
 // ===== 404 Handler =====
@@ -56,6 +71,8 @@ const server = app.listen(config.port, () => {
     🚀 Server started successfully
     Environment: ${config.env}
     Port: ${config.port}
+    Dashboard: http://localhost:${config.port}
+    API Docs: http://localhost:${config.port}/api/health
     ========================================
   `);
 });
@@ -88,3 +105,5 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
+
+module.exports = app;

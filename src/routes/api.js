@@ -9,7 +9,11 @@ const router = express.Router();
  * Health check endpoint
  */
 router.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date() });
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date(),
+    uptime: process.uptime(),
+  });
 });
 
 /**
@@ -21,5 +25,14 @@ router.post('/data',
 );
 
 router.get('/data', dataController.getData);
+
+router.get('/data/:id', dataController.getDataById);
+
+router.delete('/data/:id', dataController.deleteData);
+
+/**
+ * Statistics and metrics
+ */
+router.get('/stats', dataController.getStats);
 
 module.exports = router;
